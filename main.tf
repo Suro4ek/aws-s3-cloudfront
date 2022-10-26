@@ -1,9 +1,9 @@
-
 provider "aws" {
   access_key = ""
   secret_key = ""
   region = "us-east-1"
 }
+
 
 variable "bucket_name"{
   type = string
@@ -35,32 +35,65 @@ resource "aws_s3_object" "index" {
   
 # }
 
-# data "aws_acm_certificate" "kit_imi_sertificate" {
-#   domain = "*.kit-imi.info" 
+data "aws_acm_certificate" "kit_imi_sertificate" {
+  domain = "*.kit-imi.info" 
   
-# }
+}
 
-# resource "aws_cloudfront_distribution" "cdn" {
-#    origin {
-#      domain_name = "tests3q12321.kit-imi.info"
-#      origin_id = aws_s3_bucket.create.bucket_domain_name
-#    }
-#    enabled = true
-#    default_root_object = "index.html"
-#    restrictions {
-#      geo_restriction {
-#       restriction_type = "none"
-#       locations        = [] 
-#      }
-#    }
-#    default_cache_behavior {
-#      target_origin_id = aws_s3_bucket.create.bucket_domain_name
-#      cached_methods = ["GET", "HEAD"]
-#      viewer_protocol_policy = "redirect-to-https"
-#      allowed_methods = ["GET","HEAD"]
-#    }
+resource "aws_cloudfront_distribution" "cdn" {
+   origin {
+     domain_name = aws_s3_bucket_website_configuration.web.website_endpoint
+     origin_id = "tests3q12321-${var.bucket_name}"
 
-#   viewer_certificate {
-#     acm_certificate_arn = "${data.aws_acm_certificate.kit_imi_sertificate.arn}"
-#   }
-# }
+    custom_origin_config {
+      http_port = 80
+      https_port = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols = ["TLSv1", "TLSv1.1", "TLSv1.2"]
+    }
+   }
+   enabled = true
+   default_root_object = "index.html"
+   restrictions {
+     geo_restriction {
+      restriction_type = "none"
+     }
+   }
+
+   aliases = ["test.kit-imi.info"]
+   default_cache_behavior {
+     target_origin_id = "tests3q12321-${var.bucket_name}"
+     cached_methods = ["GET", "HEAD"]
+     viewer_protocol_policy = "redirect-to-https"
+     allowed_methods = ["GET","HEAD"]
+
+     forwarded_values {
+      query_string = false
+
+      cookies {
+        forward = "none"
+      }
+     }
+   }
+
+  viewer_certificate {
+    acm_certificate_arn = "${data.aws_acm_certificate.kit_imi_sertificate.arn}"
+    ssl_support_method = "sni-only"
+    minimum_protocol_version = "TLSv1.1_2016"
+  }
+}
+
+
+data "aws_route53_zone" "cloudfront_zone" {
+  name         = "kit-imi.info."
+}
+
+
+resource "aws_route53_record" "cloudfront" {
+  zone_id = data.aws_route53_zone.cloudfront_zone.zone_id
+  name    = "test"
+  type    = "CNAME"
+  ttl     = 5
+
+  records        = ["${aws_cloudfront_distribution.cdn.domain_name}"]
+}
