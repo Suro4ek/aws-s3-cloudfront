@@ -1,18 +1,11 @@
 provider "aws" {
-  access_key = ""
-  secret_key = ""
+  access_key = "${var.access_key}"
+  secret_key = "${var.secret_key}"
   region = "us-east-1"
-}
-
-
-variable "bucket_name"{
-  type = string
-  default = "test-terraform-bucket123213123312321"
 }
 
 resource "aws_s3_bucket" "create" {
   bucket = var.bucket_name
-  
 }
 
 resource "aws_s3_bucket_website_configuration" "web" {
@@ -37,13 +30,12 @@ resource "aws_s3_object" "index" {
 
 data "aws_acm_certificate" "kit_imi_sertificate" {
   domain = "*.kit-imi.info" 
-  
 }
 
 resource "aws_cloudfront_distribution" "cdn" {
    origin {
      domain_name = aws_s3_bucket_website_configuration.web.website_endpoint
-     origin_id = "tests3q12321-${var.bucket_name}"
+     origin_id = "unical-${var.bucket_name}"
 
     custom_origin_config {
       http_port = 80
@@ -60,9 +52,9 @@ resource "aws_cloudfront_distribution" "cdn" {
      }
    }
 
-   aliases = ["test.kit-imi.info"]
+   aliases = ["${var.domain_name}.kit-imi.info"]
    default_cache_behavior {
-     target_origin_id = "tests3q12321-${var.bucket_name}"
+     target_origin_id = "unical-${var.bucket_name}"
      cached_methods = ["GET", "HEAD"]
      viewer_protocol_policy = "redirect-to-https"
      allowed_methods = ["GET","HEAD"]
@@ -91,7 +83,7 @@ data "aws_route53_zone" "cloudfront_zone" {
 
 resource "aws_route53_record" "cloudfront" {
   zone_id = data.aws_route53_zone.cloudfront_zone.zone_id
-  name    = "test"
+  name    = "${var.domain_name}"
   type    = "CNAME"
   ttl     = 5
 
